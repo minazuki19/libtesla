@@ -520,10 +520,14 @@ namespace tsl {
 
                     stbtt_fontinfo *currFont = nullptr;
 
-                    if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
-                        currFont = &this->m_extFont;
-                    else
+                    if (stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter))
                         currFont = &this->m_stdFont;
+                    else if (stbtt_FindGlyphIndex(&this->m_cns_stdFont, currCharacter))
+                        currFont = &this->m_cns_stdFont;
+                    else if (stbtt_FindGlyphIndex(&this->m_cns_extFont, currCharacter))
+                        currFont = &this->m_cns_extFont;
+                    else
+                        currFont = &this->m_extFont;
 
                     float currFontSize = stbtt_ScaleForPixelHeight(currFont, fontSize);
                     currX += currFontSize * stbtt_GetCodepointKernAdvance(currFont, prevCharacter, currCharacter);
@@ -593,7 +597,7 @@ namespace tsl {
             bool m_scissoring = false;
             u16 m_scissorBounds[4];
 
-            stbtt_fontinfo m_stdFont, m_extFont;
+            stbtt_fontinfo m_stdFont, m_extFont, m_cns_stdFont, m_cns_extFont;
 
             static inline float s_opacity = 1.0F;
 
@@ -754,9 +758,9 @@ namespace tsl {
             Result initFonts() {
                 Result res;
 
-                static PlFontData stdFontData, extFontData;
+                static PlFontData stdFontData, extFontData, cns_stdFontData, cns_extFontData;
 
-                // Nintendo's default font
+                // Nintendo's default font  Japan, US and Europe
                 if(R_FAILED(res = plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard)))
                     return res;
 
@@ -769,6 +773,20 @@ namespace tsl {
 
                 fontBuffer = reinterpret_cast<u8*>(extFontData.address);
                 stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+
+                // Chinese Simplified
+                if(R_FAILED(res = plGetSharedFontByType(&cns_stdFontData, PlSharedFontType_ChineseSimplified)))
+                    return res;
+
+                fontBuffer = reinterpret_cast<u8*>(cns_stdFontData.address);
+                stbtt_InitFont(&this->m_cns_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+
+                // Extended Chinese Simplified
+                if(R_FAILED(res = plGetSharedFontByType(&cns_extFontData, PlSharedFontType_ExtChineseSimplified)))
+                    return res;
+
+                fontBuffer = reinterpret_cast<u8*>(cns_extFontData.address);
+                stbtt_InitFont(&this->m_cns_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
 
                 return res;
             }
