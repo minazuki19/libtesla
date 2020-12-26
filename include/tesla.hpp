@@ -520,14 +520,14 @@ namespace tsl {
 
                     stbtt_fontinfo *currFont = nullptr;
 
-                    if (stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter))
-                        currFont = &this->m_stdFont;
+                    if (stbtt_FindGlyphIndex(&this->m_cns_extFont, currCharacter))
+                        currFont = &this->m_cns_extFont;
                     else if (stbtt_FindGlyphIndex(&this->m_cns_stdFont, currCharacter))
                         currFont = &this->m_cns_stdFont;
-                    else if (stbtt_FindGlyphIndex(&this->m_cns_extFont, currCharacter))
-                        currFont = &this->m_cns_extFont;
-                    else
+                    else if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
+                    else
+                        currFont = &this->m_stdFont;
 
                     float currFontSize = stbtt_ScaleForPixelHeight(currFont, fontSize);
                     currX += currFontSize * stbtt_GetCodepointKernAdvance(currFont, prevCharacter, currCharacter);
