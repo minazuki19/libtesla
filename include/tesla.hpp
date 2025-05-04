@@ -119,8 +119,41 @@ PadState pad;
 uint16_t framebufferWidth = 448;
 uint16_t framebufferHeight = 720;
 bool deactivateOriginalFooter = false;
+bool fontCache = true;
 
 using namespace std::literals::chrono_literals;
+
+struct GlyphInfo {
+	u8* pointer;
+	int width;
+	int height;
+};
+
+struct KeyPairHash {
+	std::size_t operator()(const std::pair<int, float>& key) const {
+		// Combine hashes of both components
+		std::size_t h1 = std::hash<int>{}(key.first);
+		
+		// Handle potential floating-point precision issues with epsilon comparison
+		// We convert the float to a long integer representation
+		const float epsilon = 0.00001f;
+		long long floatInt = static_cast<long long>(key.second / epsilon);
+		std::size_t h2 = std::hash<long long>{}(floatInt);
+		
+		return h1 ^ (h2 << 1); // Combine the hashes
+	}
+};
+
+// Custom equality comparison for int-float pairs
+struct KeyPairEqual {
+	bool operator()(const std::pair<int, float>& lhs, const std::pair<int, float>& rhs) const {
+		const float epsilon = 0.00001f;
+		return lhs.first == rhs.first && 
+			std::abs(lhs.second - rhs.second) < epsilon;
+	}
+};
+
+std::unordered_map<std::pair<s32, float>, GlyphInfo, KeyPairHash, KeyPairEqual> cache;
 
 namespace tsl {
 
@@ -1033,10 +1066,28 @@ namespace tsl {
 			 * @param font STB Font to use
 			 * @param fontSize Font size
 			 */
+
 			inline void drawGlyph(s32 codepoint, s32 x, s32 y, Color color, stbtt_fontinfo *font, float fontSize) {
 				int width = 10, height = 10;
 
-				u8 *glyphBmp = stbtt_GetCodepointBitmap(font, fontSize, fontSize, codepoint, &width, &height, nullptr, nullptr);
+				u8* glyphBmp = nullptr;
+
+				if (fontCache) {
+					auto pair = std::make_pair(codepoint, fontSize);
+					if (cache.contains(pair) == true) {
+						GlyphInfo data = cache[pair];
+						glyphBmp = data.pointer;
+						width = data.width;
+						height = data.height;
+					}
+					else {
+						glyphBmp = stbtt_GetCodepointBitmap(font, fontSize, fontSize, codepoint, &width, &height, nullptr, nullptr);
+						if (glyphBmp) cache[pair] = GlyphInfo{glyphBmp, width, height};
+					}
+				}
+				else {
+					glyphBmp = stbtt_GetCodepointBitmap(font, fontSize, fontSize, codepoint, &width, &height, nullptr, nullptr);
+				}
 				
 				if (glyphBmp == nullptr)
 					return;
@@ -1049,7 +1100,7 @@ namespace tsl {
 					}
 				}
 
-				std::free(glyphBmp);
+				if (!fontCache) std::free(glyphBmp);
 
 			}
 
@@ -2181,6 +2232,13 @@ namespace tsl {
 
 			this->m_guiStack.push(std::move(newGui));
 
+			if (cache.size()) {
+				for (const auto& [key, value] : cache) {
+					std::free(value.pointer);
+				}
+				cache.clear();
+			}
+
 			return this->m_guiStack.top();
 		}
 
@@ -2196,6 +2254,13 @@ namespace tsl {
 
 			this->m_guiStack.push(std::move(gui));
 
+			if (cache.size()) {
+				for (const auto& [key, value] : cache) {
+					std::free(value.pointer);
+				}
+				cache.clear();
+			}
+
 			return this->m_guiStack.top();
 		}
 
@@ -2204,6 +2269,13 @@ namespace tsl {
 		 * @note The Overlay gets closes once there are no more Guis on the stack
 		 */
 		void goBack() {
+			if (cache.size()) {
+				for (const auto& [key, value] : cache) {
+					std::free(value.pointer);
+				}
+				cache.clear();
+			}
+
 			if (!this->m_closeOnExit && this->m_guiStack.size() == 1) {
 				this->hide();
 				return;
