@@ -132,15 +132,13 @@ struct GlyphInfo {
 struct KeyPairHash {
 	std::size_t operator()(const std::pair<int, float>& key) const {
 		// Combine hashes of both components
-		std::size_t h1 = std::hash<int>{}(key.first);
-		
-		// Handle potential floating-point precision issues with epsilon comparison
-		// We convert the float to a long integer representation
-		const float epsilon = 0.00001f;
-		long long floatInt = static_cast<long long>(key.second / epsilon);
-		std::size_t h2 = std::hash<long long>{}(floatInt);
-		
-		return h1 ^ (h2 << 1); // Combine the hashes
+		union returnValue {
+			char c[8];
+			std::size_t s;
+		} value;
+		memcpy(&value.c[0], &key.first, 4);
+		memcpy(&value.c[4], &key.second, 4);
+		return value.s;
 	}
 };
 
@@ -1006,6 +1004,12 @@ namespace tsl {
 				viCloseDisplay(&this->m_display);
 				eventClose(&this->m_vsyncEvent);
 				viExit();
+				if (cache.size()) {
+					for (const auto& [key, value] : cache) {
+						std::free(value.pointer);
+					}
+					cache.clear();
+				}
 			}
 
 			/**
