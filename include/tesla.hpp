@@ -1078,11 +1078,11 @@ namespace tsl {
 
 				if (fontCache) {
 					auto pair = std::make_pair(codepoint, fontSize);
-					if (cache.contains(pair) == true) {
-						GlyphInfo data = cache[pair];
-						glyphBmp = data.pointer;
-						width = data.width;
-						height = data.height;
+					auto found = cache.find(pair);
+					if (found != cache.end()) {
+						glyphBmp = found -> second.pointer;
+						width = found -> second.width;
+						height = found -> second.height;
 					}
 					else {
 						glyphBmp = stbtt_GetCodepointBitmap(font, fontSize, fontSize, codepoint, &width, &height, nullptr, nullptr);
